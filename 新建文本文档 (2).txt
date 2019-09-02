@@ -1,0 +1,126 @@
+public void Hint(final Activity context) {
+        String currWindow = getCurrentActivity().getClass().getName();
+        String[] infos = currWindow.split("\\.");
+        String currentWindow = infos[infos.length - 1];
+        String[] nodeWindows = edgeInfo.getPath().split("->");
+
+        if (edgeInfo.getDataType().equals(0)) {
+
+            View bottemView = LayoutInflater.from(context).inflate(R.layout.dialoglistview, null);
+            TextView textView = (TextView) bottemView.findViewById(R.id.dialoglist_id);
+            textView.setText("Recommended Event:");
+            final ListView listView = (ListView) bottemView.findViewById(R.id.listView);
+            List<EdgeInfo> edgeInfos = new ArrayList<>();
+            edgeInfos.add(edgeInfo);
+            listView.setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
+            final EdgeInfoAdapter edgeInfoAdapter = new EdgeInfoAdapter(context, R.layout.edgeitem, edgeInfos);
+            listView.setAdapter(edgeInfoAdapter);
+            //
+
+
+            AlertDialog.Builder builder = new AlertDialog.Builder(context);
+            builder.setView(bottemView)
+                    .setPositiveButton("OK", null)
+                    .create();
+            builder.show();
+
+        } else if (edgeInfo.getDataType().equals(2)) {
+            for (int i = 0; i < nodeWindows.length - 1; i++) {
+                //第一次到达最后一条跳转A-B-C-D:C-D
+                if (nodeWindows[i].equals(currentWindow) && nodeWindows[i + 1].equals(currentWindow)
+                        && i + 1 == nodeWindows.length - 1 && edgeInfo.getCount() == 0) {
+                    //推荐bug
+
+                    View bottemView = LayoutInflater.from(context).inflate(R.layout.dialoglistview, null);
+                    TextView textView = (TextView) bottemView.findViewById(R.id.dialoglist_id);
+                    textView.setText("Trigger Exception:");
+                    final ListView listView = (ListView) bottemView.findViewById(R.id.listView);
+                    List<EdgeInfo> edgeInfos = new ArrayList<>();
+                    edgeInfos.add(edgeInfo);
+                    listView.setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
+                    final EdgeInfoAdapter edgeInfoAdapter = new EdgeInfoAdapter(context, R.layout.edgeitem, edgeInfos);
+                    listView.setAdapter(edgeInfoAdapter);
+
+                    AlertDialog.Builder builder = new AlertDialog.Builder(context);
+                    builder.setView(bottemView)
+                            .setPositiveButton("OK", null)
+                            .create();
+                    builder.show();
+                    edgeInfo.setCount(1);
+                    Log.i(TAG, "Hint: 1111111111111111111111111111");
+                } else if (nodeWindows[i].equals(currentWindow) && nodeWindows[i + 1].equals(currentWindow)
+                        && i + 1 == nodeWindows.length - 1 && edgeInfo.getCount() != 0) {
+                    //第二次在最后跳转中请求提示
+
+                    TextView textView = new TextView(context);
+                    StringBuilder builder = new StringBuilder();
+                    builder.append("You have completed this task");
+                    builder.append("\n");
+                    builder.append("Please choose another task");
+                    textView.setText(builder.toString());
+                    AlertDialog alertDialog = new AlertDialog.Builder(context)
+                            .setTitle("Hint")
+                            .setView(textView)
+                            .setPositiveButton("OK", null)
+                            .create();
+                    alertDialog.show();
+
+                    Log.i(TAG, "Hint: 2222222222222222222");
+                } else if (nodeWindows[i].equals(currentWindow)) {
+                    //A-B-C-D:B-C
+                    handler = new Handler() {
+                        @RequiresApi(api = Build.VERSION_CODES.KITKAT)
+                        public void handleMessage(Message msg) {
+                            switch (msg.what) {
+                                case MSG_OK:
+                                    Toast.makeText(context, "Get Success", Toast.LENGTH_SHORT).show();
+                                    Log.e("response", msg.obj.toString());
+                                    try {
+                                        JSONObject result = new JSONObject(msg.obj.toString());
+                                        JSONArray dataarray = result.getJSONArray("data");
+                                        JSONObject data = dataarray.getJSONObject(0);
+
+                                        String eventHandlers = data.getString("eventHandlers");
+                                        String imageUrl = data.getString("imageUrl");
+
+                                        ImageView imageView = new ImageView(context);
+                                        Glide.with(context).load(edgeInfo.getImageUrl()).into(imageView);
+
+                                        StringBuilder message = new StringBuilder();
+                                        message.append("Hint: ");
+                                        message.append(eventHandlers);
+
+                                        new AlertDialog.Builder(context)
+                                                .setTitle(message.toString())
+                                                .setView(imageView)
+                                                .setPositiveButton("OK", null);
+                                    } catch (Exception e) {
+                                        e.printStackTrace();
+                                    }
+                            }
+                        }
+                    };
+                    OkHttpRequest.sendOkHttpRequest("http://118.178.18.181:58015/path/nextHint/"
+                                    + currentWindow + "/" + nodeWindows[i + 1] + "/" + new Long(edgeInfo.getId()),
+                            new okhttp3.Callback() {
+
+                                @Override
+                                public void onFailure(Call call, IOException e) {
+                                    Message message = new Message();
+                                    message.what = MSG_FAIL;
+                                    handler.sendMessage(message);
+                                }
+
+                                @Override
+                                public void onResponse(Call call, Response response) throws IOException {
+                                    Message message = new Message();
+                                    message.what = MSG_OK;
+                                    message.obj = response.body().string();
+                                    handler.sendMessage(message);
+                                }
+                            });
+                }
+            }
+        }
+
+    }
